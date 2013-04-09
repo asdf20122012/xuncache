@@ -2,16 +2,14 @@
     include "xuncache.class.php";
 
     $xuncache = new xuncache();
-    $data['name'] = "xuncache";
-    $data['time'] = "20130408";
     //添加数据
-    $status = $xuncache->key("syx")->add($data);
+    $status = $xuncache->key("xuncache")->add("xuncache");
     dump($status);
     //查找数据
-    $cache = $xuncache->key("syx")->find();
+    $cache = $xuncache->key("xuncache")->find();
     dump($cache);
     //删除数据
-    $status = $xuncache->key("syx")->del();
+    $status = $xuncache->key("xuncache")->del();
     dump($status);
 
  ?>

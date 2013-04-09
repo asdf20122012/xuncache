@@ -92,7 +92,7 @@
     public function find(){
         $array['Pass'] = self::$password;
         $array['Key'] = self::$options['key'];
-        $array['Protocol'] = "find";
+        $array['Protocol'] = "get";
         $arrange = json_encode($array);
         if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
             return false;
@@ -143,7 +143,7 @@
             }
             
         }
-        return (bool)$accept->status;
+        return @(bool)$accept->status;
     }
 
     /**
