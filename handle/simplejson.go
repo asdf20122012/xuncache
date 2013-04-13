@@ -1,9 +1,9 @@
-package simplejson
+package handle
 
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"strconv"
 )
 
 // returns the current implementation version
@@ -118,6 +118,10 @@ func (j *Json) String() (string, error) {
 	if s, ok := (j.data).(string); ok {
 		return s, nil
 	}
+	if (j.data) != nil {
+		s := strconv.FormatFloat((j.data).(float64), 'f', -1, 64)
+		return s, nil
+	}
 	return "", errors.New("type assertion to string failed")
 }
 
@@ -170,76 +174,4 @@ func (j *Json) StringArray() ([]string, error) {
 		retArr = append(retArr, s)
 	}
 	return retArr, nil
-}
-
-// MustString guarantees the return of a `string` (with optional default)
-//
-// useful when you explicitly want a `string` in a single value return context:
-//     myFunc(js.Get("param1").MustString(), js.Get("optional_param").MustString("my_default"))
-func (j *Json) MustString(args ...string) string {
-	var def string
-
-	switch len(args) {
-	case 0:
-		break
-	case 1:
-		def = args[0]
-	default:
-		log.Panicf("MustString() received too many arguments %d", len(args))
-	}
-
-	s, err := j.String()
-	if err == nil {
-		return s
-	}
-
-	return def
-}
-
-// MustInt guarantees the return of an `int` (with optional default)
-//
-// useful when you explicitly want an `int` in a single value return context:
-//     myFunc(js.Get("param1").MustInt(), js.Get("optional_param").MustInt(5150))
-func (j *Json) MustInt(args ...int) int {
-	var def int
-
-	switch len(args) {
-	case 0:
-		break
-	case 1:
-		def = args[0]
-	default:
-		log.Panicf("MustInt() received too many arguments %d", len(args))
-	}
-
-	i, err := j.Int()
-	if err == nil {
-		return i
-	}
-
-	return def
-}
-
-// MustFloat64 guarantees the return of a `float64` (with optional default)
-//
-// useful when you explicitly want a `float64` in a single value return context:
-//     myFunc(js.Get("param1").MustFloat64(), js.Get("optional_param").MustFloat64(5.150))
-func (j *Json) MustFloat64(args ...float64) float64 {
-	var def float64
-
-	switch len(args) {
-	case 0:
-		break
-	case 1:
-		def = args[0]
-	default:
-		log.Panicf("MustFloat64() received too many arguments %d", len(args))
-	}
-
-	i, err := j.Float64()
-	if err == nil {
-		return i
-	}
-
-	return def
 }
