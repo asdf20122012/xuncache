@@ -2,13 +2,13 @@
 ========
 xuncache 是免费开源的NOSQL(内存数据库) 采用golang开发,简单易用而且 功能强大(就算新手也完全胜任)、性能卓越能轻松处理海量数据,可用于缓存系统.
 
-目前版本 version 0.3
+目前版本 version 0.4
 
 前期它是活跃的 更新很迅速
 
 version 1.0版本前 作者不推荐用于生产环境
 
-采用json协议 socket通信 --后期打算用bson
+开发分支.目前代码全部重新重构
 
 ## 目前功能
 ========
@@ -27,23 +27,6 @@ version 1.0版本前 作者不推荐用于生产环境
 ========
 
 	$xuncache = new xuncache();
-    //字符串类型操作
-
-        //添加数据
-        $string = $xuncache->key("xuncache")->add("xuncache");
-        dump($string);
-        //bool(true)
-
-        //查找数据
-        $string = $xuncache->key("xuncache")->find();
-        dump($string);
-        //string(8) "xuncache"
-
-        //删除数据
-        $status = $xuncache->key("xuncache")->del();
-        dump($status);
-        //bool(true)
-
     //数组操作(仅支持二位数组)
 
         $array['name']    =  "xuncache";
