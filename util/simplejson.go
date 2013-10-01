@@ -1,4 +1,4 @@
-package handle
+package util
 
 import (
 	"encoding/json"
@@ -106,11 +106,19 @@ func (j *Json) Array() ([]interface{}, error) {
 }
 
 // Bool type asserts to `bool`
-func (j *Json) Bool() (bool, error) {
+func (j *Json) Bool() bool {
 	if s, ok := (j.data).(bool); ok {
-		return s, nil
+		return s
 	}
-	return false, errors.New("type assertion to bool failed")
+
+	if s, ok := (j.data).(string); ok && s == "true" {
+		return true
+	}
+
+	if s, ok := (j.data).(string); ok && s == "false" {
+		return false
+	}
+	return false
 }
 
 // String type asserts to `string`
@@ -143,12 +151,16 @@ func (j *Json) Int() (int, error) {
 }
 
 // Int type asserts to `float64` then converts to `int64`
-func (j *Json) Int64() (int64, error) {
+func (j *Json) Uint64() uint64 {
 	if f, ok := (j.data).(float64); ok {
-		return int64(f), nil
+		return uint64(f)
+	}
+	if s, ok := (j.data).(string); ok {
+		s_int, _ := strconv.Atoi(s)
+		return uint64(s_int)
 	}
 
-	return -1, errors.New("type assertion to float64 failed")
+	return 0
 }
 
 // Bytes type asserts to `[]byte`
@@ -157,21 +169,4 @@ func (j *Json) Bytes() ([]byte, error) {
 		return []byte(s), nil
 	}
 	return nil, errors.New("type assertion to []byte failed")
-}
-
-// StringArray type asserts to an `array` of `string`
-func (j *Json) StringArray() ([]string, error) {
-	arr, err := j.Array()
-	if err != nil {
-		return nil, err
-	}
-	retArr := make([]string, 0, len(arr))
-	for _, a := range arr {
-		s, ok := a.(string)
-		if !ok {
-			return nil, err
-		}
-		retArr = append(retArr, s)
-	}
-	return retArr, nil
 }

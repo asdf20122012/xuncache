@@ -8,8 +8,6 @@
      +------------------------------------------------------------------------------
      */
     class xuncache {
-        // xuncache操作对象
-        protected $xuncache;
         //静态实例化对象
         protected static $socket;
         //连接IP
