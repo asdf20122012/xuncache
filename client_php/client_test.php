@@ -1,4 +1,6 @@
 <?php
+
+    error_reporting(E_ERROR);
     include "xuncache.class.php";
 
     $xuncache = new xuncache();
@@ -8,13 +10,12 @@
         $array['num']     =  1;
         $array['version'] =  "beta";
         //增加数组
-        //$status = $xuncache->key("array")->add($array);
-        $array = $xuncache->key("array")->index(5)->find();
-        dump($array);
+        $status = $xuncache->key("array")->add($array);
+        dump($status);
         //bool(true)
 
         //查找数组
-        //$array = $xuncache->key("array")->find();
+        //$array = $xuncache->key("array")->index(5)->find();
         //dump($array);
         /*  array(2) {
         *      ["name"] => string(8) "xuncache"

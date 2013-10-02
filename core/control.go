@@ -10,19 +10,19 @@ import (
 )
 
 //存储类型
-var Store_list = &List{name: make(map[string][]*Store)}
+var Store_list = &List{Name: make(map[string][]*Store)}
 
 //队列类型
 type List struct {
-	name map[string][]*Store
-	time uint64
+	Name map[string][]*Store
+	Time uint64
 	lock sync.RWMutex
 }
 
 //原子类型
 type Store struct {
-	id    uint64
-	value map[string]interface{}
+	Id    uint64
+	Value map[string]interface{}
 	lock  sync.RWMutex
 }
 
@@ -107,10 +107,10 @@ func (Receive *Basic) push() (result []byte) {
 	Push.Index = Receive.Sources.Get("index").Uint64()
 	//初始化类型
 	stroe := &Store{
-		value: make(map[string]interface{}),
+		Value: make(map[string]interface{}),
 	}
 	//获取数据
-	stroe.value, err = Receive.Sources.Get("data").Map()
+	stroe.Value, err = Receive.Sources.Get("data").Map()
 	if err != nil {
 		return Errors(errors.New("key does not exist!"))
 	}
@@ -122,12 +122,12 @@ func (Receive *Basic) push() (result []byte) {
 	if max_id < Push.Index {
 		max_id = Push.Index
 	}
-	stroe.id = max_id
-	Store_list.name[Push.Key] = append(Store_list.name[Push.Key], stroe)
+	stroe.Id = max_id
+	Store_list.Name[Push.Key] = append(Store_list.Name[Push.Key], stroe)
 	//返回结果
 	Back := &types.Back_Push{
 		Errors: false,
-		Id:     stroe.id,
+		Id:     stroe.Id,
 	}
 	result, _ = json.Marshal(Back)
 	return
@@ -154,17 +154,15 @@ func (Receive *Basic) find() (result []byte) {
 		Key:   Push.Key,
 		Index: Push.Index,
 		Min:   0,
-		Max:   uint64(len(Store_list.name[Push.Key]) - 1),
+		Max:   uint64(len(Store_list.Name[Push.Key]) - 1),
 	}
 	fmt.Println(Locate_Index)
 	index_nums, err := Locate_Index.dichotomy()
-	fmt.Println(err)
 	if err == true {
 		return Errors(errors.New("Index does not exist!"))
 	}
-	fmt.Println(index_nums)
-	fmt.Println(Store_list.name[Push.Key][index_nums])
-	return []byte("test")
+	result, _ = json.Marshal(Store_list.Name[Push.Key][index_nums])
+	return
 }
 
 func (Receive *Basic) query() (result []byte) {
@@ -185,11 +183,11 @@ func (Receive *Basic) delete() (result []byte) {
 
 //获取最大Id
 func (Lists *List) List_max_Id(key string) uint64 {
-	max_nums := len(Lists.name[key]) - 1
+	max_nums := len(Lists.Name[key]) - 1
 	if max_nums < 0 {
 		return uint64(1)
 	}
-	return Lists.name[key][max_nums].id + 1
+	return Lists.Name[key][max_nums].Id + 1
 }
 
 //输出错误类型
@@ -208,10 +206,10 @@ func (Locate *Locate) dichotomy() (slice_index uint64, err bool) {
 		return 0, true
 	}
 	i := (Locate.Min + Locate.Max) / 2
-	if Store_list.name[Locate.Key][i].id == Locate.Index {
+	if Store_list.Name[Locate.Key][i].Id == Locate.Index {
 		slice_index = i
 	} else {
-		if Store_list.name[Locate.Key][i].id > Locate.Index {
+		if Store_list.Name[Locate.Key][i].Id > Locate.Index {
 			if Locate.Max == i {
 				return 0, true
 			}

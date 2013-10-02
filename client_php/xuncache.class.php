@@ -18,7 +18,7 @@ class xuncache {
     //连接端口
     private $port = "3351";
     //连接密码
-    private $password = "";
+    private $password = "13009120121";
     // 调试模式
     private $debug = true;
     // 查询表达式参数
@@ -40,7 +40,7 @@ class xuncache {
 		$this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         $status = @socket_connect($this->socket,$this->addr,$this->port);
         if(!$status){
-        	return false;
+        	$this->customError("connect","Unable to connect to server");
         }
     }
 
@@ -59,14 +59,65 @@ class xuncache {
     public function __call($method,$args) {
         $method = strtolower($method);
         // 连贯操作的实现
-        if(in_array($method,array('key','index'),true)) {
-            $this->options[$method] = $args[0];
+        if(in_array($method,array('key','index','time','hour','day','week','month','limit'),true)) {
+            // 连贯操作的实现
+            if(in_array($method,array("hour",'day','week','month','modern'),true)&&!$this->sval($args[0])){
+                $this->options[$method] = "ture";
+            }else{
+                //获取列表--limit过滤
+                if(in_array($method,array("limit"),true)){
+                    $limit = explode(',', $args[0]);
+                    if(!$limit[1]){
+                        $this->options['start'] = 0;  
+                        $this->options['end'] = ($limit[0] - 1);  
+                    }else{
+                        $this->options['start'] = $limit[0];  
+                        $this->options['end'] = ($limit[1] - 1);  
+                    }
+                }
+                $this->options[$method] =  $args[0]; 
+            }
             return $this;
         }else{
             return false;
         }
     }
 
+    /**
+     *----------------------------------------------------------
+     * 分析表达式
+     *----------------------------------------------------------
+     * @access proteced
+     *----------------------------------------------------------
+     * @param array $options 表达式参数
+     *----------------------------------------------------------
+     * @return array
+     *----------------------------------------------------------
+     */
+    protected function _parseOptions($options=array()) {
+        if(is_array($options))
+            $options =  array_merge($this->options,$options);
+        // 询过后清空表达式组装 避免影响下次查询查
+        $this->options = array();
+        // where条件分析
+        if(@$options['time']){
+            $time = $this->sval($options['time'])+time();
+            return (int)$time;
+        }elseif(@$options['hour']){
+            $time = $this->sval($this->hour($options['hour']));
+            return (int)$time;
+        }elseif(@$options['day']){
+            $time = $this->sval($this->day($options['day']));
+            return (int)$time;
+        }elseif(@$options['week']){
+            $time = $this->sval($this->week($options['week']));
+            return (int)$time;
+        }elseif(@$options['month']){
+            $time = $this->sval($this->month());
+            return (int)$time;
+        }
+        return false;
+    }
     /**
      *----------------------------------------------------------
      * 添加数据
@@ -81,8 +132,9 @@ class xuncache {
     public function add($array){
         $send['Pass'] = $this->password;
         $send['key'] = $this->options['key'];
+        $send['index'] = $this->options['index'];
         $send['Protocol'] = "push";
-        $send['index'] = @$this->options['index'];
+        $send['expire'] = $this->_parseOptions($this->options);;
         $send['data'] = $array;
         $array = json_encode($send);
         $this->Write($array);
@@ -112,12 +164,13 @@ class xuncache {
         $send['Pass'] = $this->password;
         $send['key'] = $this->options['key'];
         $send['index'] = $this->options['index'];
+        $send['index'] = $this->options['index'];
         $send['Protocol'] = "find";
         $array = json_encode($send);
         $this->Write($array);
         $accept = $this->Read();
-        dump($accept);
         $accept = json_decode($accept,true);
+        dump($accept);
         //状态判断
         if(@$accept["Errors"] == true && $this->debug == true){
             $this->customError("connect",@$accept["Point"]);
@@ -130,6 +183,84 @@ class xuncache {
     private function customError($errno, $errstr){ 
         echo "<b>Error:</b> [$errno] $errstr<br />";
         exit();
+    }
+
+    /**
+     *----------------------------------------------------------
+     * 时间过期计算--小时
+     *----------------------------------------------------------
+     * @access private
+     *----------------------------------------------------------
+     * @return mixed
+     *----------------------------------------------------------
+     */
+    private function hour($num) {
+        $year = date("Y");
+        $month = date("m");
+        $day = date("d");
+        $hour = date("H");
+        $mktime = mktime($hour+$num, 59, 59, $month, $day, $year);
+        return $mktime;
+    }
+
+    /**
+     *----------------------------------------------------------
+     * 时间过期计算--当天24点
+     *----------------------------------------------------------
+     * @access private
+     *----------------------------------------------------------
+     * @return mixed
+     *----------------------------------------------------------
+     */
+    private function day($num) {
+        $year = date("Y");
+        $month = date("m");
+        $day = date("d");
+        $mktime = mktime(23, 59, 59, $month, $day+$num, $year);
+        return $mktime;
+    }
+
+    /**
+     *----------------------------------------------------------
+     * 时间过期计算--星期日24点
+     *----------------------------------------------------------
+     * @access private
+     *----------------------------------------------------------
+     * @return mixed
+     *----------------------------------------------------------
+     */
+    private function week($num) {
+        $year = date("Y");
+        $month = date("m");
+        $distance = date("w",time());//获取当前星期几
+        $day = date("d");
+        $day = ($day+(7-$distance))+($num*7);//计算天数
+        $mktime = mktime(23, 59, 59, $month, $day, $year);
+        return $mktime;
+    }
+
+    /**
+     *----------------------------------------------------------
+     * 时间过期计算--月末24点
+     *----------------------------------------------------------
+     * @access private
+     *----------------------------------------------------------
+     * @return mixed
+     *----------------------------------------------------------
+     */
+    private function month() {
+        $year = date("Y");
+        $month = date("m");
+        $day = date('d');
+        $mktime = mktime(23, 59, 59, $month, $day, $year);
+        return $mktime;
+    }
+
+    //过滤除数字外所有字符
+    private function sval($num) {
+      if (!preg_match("/^\d*$/", $num)) {return false;}
+      $num = preg_replace('/\D/', '', $num);
+      return $num;
     }
 
     //Litez
@@ -210,7 +341,7 @@ class xuncache {
 	}
 
 }
-
+    
     /**
      *----------------------------------------------------------
      * 浏览器友好的变量输出

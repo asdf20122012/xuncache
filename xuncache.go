@@ -1,7 +1,7 @@
 package main
 
 import (
-	//"errors"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -11,12 +11,9 @@ import (
 	"xuncache/util"
 )
 
-var sem = make(chan bool, 1) //保存控制
 var (
-	modify, save_time, total_commands_processed uint64 //总处理数
-	err                                         error  //错误类型
-	cil_close                                   bool   //锁
-	Password                                    string //程序执行目录
+	total_commands_processed uint64 //总处理数
+	err                      error  //错误类型
 )
 
 //配置文件
@@ -25,6 +22,7 @@ type Server_info struct {
 	Port      string
 	File      string
 	Save_time uint64
+	Password  string
 }
 
 //默认常量(配置文件)
@@ -61,12 +59,12 @@ func main() {
 		conn.SetDeadline(time.Now().Add(30 * time.Second))
 		conn.SetReadDeadline(time.Now().Add(20 * time.Second))
 		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		go handleClient(conn)
+		go server.handleClient(conn)
 	}
 }
 
 //处理数据
-func handleClient(conn net.Conn) {
+func (server *Server_info) handleClient(conn net.Conn) {
 	//标记结束连接
 	defer conn.Close()
 	defer fmt.Print("Client closed connection\n")
@@ -88,13 +86,12 @@ func handleClient(conn net.Conn) {
 		}
 		//初始化
 		sources := core.Init(Receive)
-		//if Password != sources.Password {
-		//Pack.Write(core.Errors(errors.New("Password error!")))
-		//break
-		//}
+		if server.Password != sources.Password {
+			Pack.Write(core.Errors(errors.New("Password error!")))
+			return
+		}
 		Back := sources.Handle()
 		Pack.Write(Back)
-		fmt.Println(string(Back))
 	}
 }
 
@@ -122,7 +119,7 @@ func configure() (result *Server_info) {
 	if err != nil {
 		Server.File = FILE
 	}
-	Password, _ = config.GetString("server", "password")
+	Server.Password, _ = config.GetString("server", "password")
 	return Server
 }
 

@@ -6,6 +6,7 @@ package types
 type Push struct {
 	Key   string
 	Index uint64
+	Time  uint64
 }
 
 //查询key的单条数据
