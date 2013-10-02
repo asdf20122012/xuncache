@@ -49,6 +49,12 @@ type Error struct {
 }
 
 //定位索引类型 Locate
+type Locate struct {
+	Key   string
+	Index uint64
+	Min   uint64
+	Max   uint64
+}
 
 //初始化控制器
 func Init(Receive *util.Json) *Basic {
@@ -130,9 +136,37 @@ func (Receive *Basic) push() (result []byte) {
 func (Receive *Basic) save() (result []byte) {
 	return []byte("test")
 }
+
 func (Receive *Basic) find() (result []byte) {
+	//接收
+	Push := &types.Push{}
+	//key类型
+	Push.Key, err = Receive.Sources.Get("key").String()
+	if err != nil {
+		return Errors(errors.New("key does not exist!"))
+	}
+	Push.Index = Receive.Sources.Get("index").Uint64()
+	if Push.Index < 1 {
+		return Errors(errors.New("Index does not exist!"))
+	}
+	//查找
+	Locate_Index := &Locate{
+		Key:   Push.Key,
+		Index: Push.Index,
+		Min:   0,
+		Max:   uint64(len(Store_list.name[Push.Key]) - 1),
+	}
+	fmt.Println(Locate_Index)
+	index_nums, err := Locate_Index.dichotomy()
+	fmt.Println(err)
+	if err == true {
+		return Errors(errors.New("Index does not exist!"))
+	}
+	fmt.Println(index_nums)
+	fmt.Println(Store_list.name[Push.Key][index_nums])
 	return []byte("test")
 }
+
 func (Receive *Basic) query() (result []byte) {
 	return []byte("test")
 }
@@ -168,32 +202,31 @@ func Errors(Error_msg error) (result []byte) {
 	return
 }
 
-/*
 //二分法定位 主键(_id) --可以识别不存在
-func (Lists *List) Dichotomy(key string, min, max, index int) (slice_index int, err bool) {
-	if index < 1 || max < 1 {
-		return -1, true
+func (Locate *Locate) dichotomy() (slice_index uint64, err bool) {
+	if Locate.Index < 1 || Locate.Max < 1 {
+		return 0, true
 	}
-
-	i := int((min + max) / 2)
-	if Store_list[key][i]["_id"].(int) == index {
+	i := (Locate.Min + Locate.Max) / 2
+	if Store_list.name[Locate.Key][i].id == Locate.Index {
 		slice_index = i
 	} else {
-		if Store_list[key][i]["_id"].(int) > index {
-			if max == i {
-				return -1, true
+		if Store_list.name[Locate.Key][i].id > Locate.Index {
+			if Locate.Max == i {
+				return 0, true
 			}
-			slice_index, _ = Lists.Dichotomy(key, min, i, index)
+			Locate.Max = i
+			slice_index, err = Locate.dichotomy()
 		} else {
-			if min == i {
-				return -1, true
+			if Locate.Min == i {
+				return 0, true
 			}
-			slice_index, _ = Lists.Dichotomy(key, i, max, index)
+			Locate.Min = i
+			slice_index, err = Locate.dichotomy()
 		}
 	}
-	if slice_index < 0 {
-		return -1, true
+	if err == true {
+		return 0, true
 	}
 	return slice_index, false
 }
-*/

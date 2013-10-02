@@ -1,56 +1,47 @@
 <?php
-    /**
+
+class xuncache {
+	/**
      +------------------------------------------------------------------------------
-     * xuncache模型类
+     * xuncache模型类 + Litez Tcp协议
      +------------------------------------------------------------------------------
      * @author    sun8911879 <joijoi360@gmail.com>
-     * @version   $Id: xuncache.class.php 2013-04-06 22:54:00 sun8911879 $
+     * @version   $Id: xuncache.class.php 2013-09-26 22:54:00 sun8911879 $
      +------------------------------------------------------------------------------
-     */
-    class xuncache {
-        //静态实例化对象
-        protected static $socket;
-        //连接IP
-        protected static $addr = "127.0.0.1";
-        //连接端口
-        protected static $port = "3351";
-        //连接密码
-        protected static $password = "";
-        // 调试模式
-        protected static $debug = true;
-        // 查询表达式参数
-        protected static $options = array();
+    */
+	private $send_pack = array();
+	private $send_over;
+	private $tmp_buffio_cap = 128;
 
-    /**
-     +----------------------------------------------------------
+    //连接IP
+    private $addr = "127.0.0.1";
+    //连接端口
+    private $port = "3351";
+    //连接密码
+    private $password = "";
+    // 调试模式
+    private $debug = true;
+    // 查询表达式参数
+    private $options = array();
+	/**
+     *----------------------------------------------------------
      * 架构函数
-     * 取得DB类的实例对象
-     +----------------------------------------------------------
-     * @param string $name 模型名称
-     * @param mixed $connection 数据库连接信息
-     +----------------------------------------------------------
+     * 取得TCP类的实例对象
+     *----------------------------------------------------------
+     * @param mixed $connection TCP连接信息
+     *----------------------------------------------------------
      * @access public
-     +----------------------------------------------------------
+     *----------------------------------------------------------
      */
     public function __construct() {
-        
-        // 数据库初始化操作
-        // 当前模型数据库连接信息
-        if(!self::$socket){
-            self::$socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-            if (self::$socket < 1) {
-                return false;
-            }
-            $source = @socket_connect(self::$socket, self::$addr, self::$port);
-            if ($source < 1) {
-                if(self::$debug == true){
-                    $this->customError("connect","Unable to connect the server side");
-                }else{
-                    return false;
-                }
-            }
+        $this->send_pack["v"] = 0.1;
+		$this->send_pack["pact"] = "litez";
+		$this->send_pack["type"] = "msg";
+		$this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        $status = @socket_connect($this->socket,$this->addr,$this->port);
+        if(!$status){
+        	return false;
         }
-
     }
 
     /**
@@ -68,8 +59,8 @@
     public function __call($method,$args) {
         $method = strtolower($method);
         // 连贯操作的实现
-        if(in_array($method,array('key'),true)) {
-            self::$options[$method] = $args[0];
+        if(in_array($method,array('key','index'),true)) {
+            $this->options[$method] = $args[0];
             return $this;
         }else{
             return false;
@@ -78,7 +69,7 @@
 
     /**
      *----------------------------------------------------------
-     * 添加数据--字符串
+     * 添加数据
      *----------------------------------------------------------
      * @access public
      *----------------------------------------------------------
@@ -87,31 +78,28 @@
      * @return mixed
      *----------------------------------------------------------
      */
-    public function add($arr){
-        $array['Pass'] = self::$password;
-        $array['Key'] = self::$options['key'];
-        $array['Protocol'] = "set";
-        $array['Data'] = (string)$arr;
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
+    public function add($array){
+        $send['Pass'] = $this->password;
+        $send['key'] = $this->options['key'];
+        $send['Protocol'] = "push";
+        $send['index'] = @$this->options['index'];
+        $send['data'] = $array;
+        $array = json_encode($send);
+        $this->Write($array);
+        $accept = $this->Read();
+        $accept = json_decode($accept,true);
+        //状态判断
+        if(@$accept["Errors"] == true && $this->debug == true){
+            $this->customError("connect",@$accept["Point"]);
+        }elseif(@$accept["Errors"] == true){
             return false;
-        }else{
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            
         }
-        return @(bool)$accept->status;
+        return @$accept["Id"];
     }
 
     /**
      *----------------------------------------------------------
-     * 查询数据--字符串
+     * 查找单条数据
      *----------------------------------------------------------
      * @access public
      *----------------------------------------------------------
@@ -121,265 +109,107 @@
      *----------------------------------------------------------
      */
     public function find(){
-        $array['Pass'] = self::$password;
-        $array['Key'] = self::$options['key'];
-        $array['Protocol'] = "get";
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
+        $send['Pass'] = $this->password;
+        $send['key'] = $this->options['key'];
+        $send['index'] = $this->options['index'];
+        $send['Protocol'] = "find";
+        $array = json_encode($send);
+        $this->Write($array);
+        $accept = $this->Read();
+        dump($accept);
+        $accept = json_decode($accept,true);
+        //状态判断
+        if(@$accept["Errors"] == true && $this->debug == true){
+            $this->customError("connect",@$accept["Point"]);
+        }elseif(@$accept["Errors"] == true){
             return false;
-        }else{
-
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            if(count((array)$accept->data)<1){
-                return false;
-            }
         }
-        return (string)$accept->data;
+        return @$accept["Id"];
     }
-
-
-    /**
-     *----------------------------------------------------------
-     * 删除数据--字符串
-     *----------------------------------------------------------
-     * @access public
-     *----------------------------------------------------------
-     * @param mixed $options 表达式参数
-     *----------------------------------------------------------
-     * @return mixed
-     *----------------------------------------------------------
-     */
-    public function del(){
-        $array['Pass'] = self::$password;
-        $array['Key'] = self::$options['key'];
-        $array['Protocol'] = "delete";
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
-            return false;
-        }else{
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            
-        }
-        return (bool)$accept->status;
-    }
-
-    /**
-     *----------------------------------------------------------
-     * 添加数据--字符串
-     *----------------------------------------------------------
-     * @access public
-     *----------------------------------------------------------
-     * @param mixed $options 表达式参数
-     *----------------------------------------------------------
-     * @return mixed
-     *----------------------------------------------------------
-     */
-    public function zadd($arr){
-        $array['Pass'] = self::$password;
-        $array['Key'] = self::$options['key'];
-        $array['Protocol'] = "zset";
-        $array['Data'] = (array)$arr;
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
-            return false;
-        }else{
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            
-        }
-        return @(bool)$accept->status;
-    }
-
-    /**
-     *----------------------------------------------------------
-     * 查询数据--字符串
-     *----------------------------------------------------------
-     * @access public
-     *----------------------------------------------------------
-     * @param mixed $options 表达式参数
-     *----------------------------------------------------------
-     * @return mixed
-     *----------------------------------------------------------
-     */
-    public function zfind(){
-        $array['Pass'] = self::$password;
-        $array['Key'] = self::$options['key'];
-        $array['Protocol'] = "zget";
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
-            return false;
-        }else{
-
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            if(count((array)$accept->data)<1){
-                return false;
-            }
-        }
-        return (array)$accept->data;
-    }
-
-
-    /**
-     *----------------------------------------------------------
-     * 删除数据--字符串
-     *----------------------------------------------------------
-     * @access public
-     *----------------------------------------------------------
-     * @param mixed $options 表达式参数
-     *----------------------------------------------------------
-     * @return mixed
-     *----------------------------------------------------------
-     */
-    public function zdel(){
-        $array['Pass'] = self::$password;
-        $array['Key'] = self::$options['key'];
-        $array['Protocol'] = "zdelete";
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
-            return false;
-        }else{
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            
-        }
-        return (bool)$accept->status;
-    }
-
-
-    /**
-     *----------------------------------------------------------
-     * 数字递增
-     *----------------------------------------------------------
-     * @access public
-     *----------------------------------------------------------
-     * @param mixed $options 表达式参数
-     *----------------------------------------------------------
-     * @return mixed
-     *----------------------------------------------------------
-     */
-    public function incr($key){
-        $array['Pass'] = self::$password;
-        $array['Key'] = $key;
-        $array['Protocol'] = "incr";
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
-            return false;
-        }else{
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            
-        }
-        return (int)$accept->data;
-    }
-    /**
-     *----------------------------------------------------------
-     * 数字递减
-     *----------------------------------------------------------
-     * @access public
-     *----------------------------------------------------------
-     * @param mixed $options 表达式参数
-     *----------------------------------------------------------
-     * @return mixed
-     *----------------------------------------------------------
-     */
-    public function decr($key){
-        $array['Pass'] = self::$password;
-        $array['Key'] = $key;
-        $array['Protocol'] = "decr";
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
-            return false;
-        }else{
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            
-        }
-        return (int)$accept->data;
-    }
-
-    /**
-     *----------------------------------------------------------
-     * 获取信息
-     *----------------------------------------------------------
-     * @access public
-     *----------------------------------------------------------
-     * @param mixed $options 表达式参数
-     *----------------------------------------------------------
-     * @return mixed
-     *----------------------------------------------------------
-     */
-    public function info(){
-        $array['Pass'] = self::$password;
-        $array['Protocol'] = "info";
-        $arrange = json_encode($array);
-        if(!@socket_write(self::$socket, $arrange, strlen($arrange))){
-            return false;
-        }else{
-            $accept = @socket_read(self::$socket, 8192);
-            $accept = json_decode($accept);
-            //状态判断
-            if(@$accept->error == true&&self::$debug == true){
-                $this->customError("connect",@$accept->point);
-            }elseif(@$accept->error == true){
-                return false;
-            }
-            
-        }
-        return (array)$accept->data;
-    }
-
 
     private function customError($errno, $errstr){ 
         echo "<b>Error:</b> [$errno] $errstr<br />";
-        die();
+        exit();
     }
-}  
 
+    //Litez
+	private function Write($msg){
+		$this->send_pack["len"] = strlen($msg);
+		$send_pack = json_encode($this->send_pack).":EOF;";
+		@socket_write($this->socket, $send_pack);
+		@socket_write($this->socket, $msg);
+	}
+
+	private function Read(){
+		$pack = $this->head_pack();
+		if(!$pack){
+			return false;
+		}
+		//判断协议
+		if($pack["pact"] != $this->send_pack["pact"]){
+			return false;
+		}
+		if($pack["v"] != $this->send_pack["v"]){
+			return false;
+		}
+		if($pack["len"] < 1){
+			return false;
+		}
+		//补全之前接收到byte
+		$buffio_len = strlen($this->send_over);
+		$buffio = null;
+		$buffio = $this->send_over;
+		$this->send_over = null;
+		if($buffio_len >= $pack["len"]){
+			return substr($buffio,0,$pack["len"]);
+		}
+		if($pack["len"] < $this->tmp_buffio_cap){
+			$this->tmp_buffio_cap = $pack["len"];
+		}
+		while($head_pack_tmp = @socket_read($this->socket, $this->tmp_buffio_cap, PHP_BINARY_READ)){
+			//读取追加字节
+			$buffio .= $head_pack_tmp;
+			if(strlen($buffio)>=$pack["len"]){
+				//处理过长字符串
+				$buffio_msg = substr($buffio,0,$pack["len"]);
+				//冗余到下个通道
+				$this->send_over = null;
+				$this->send_over = substr($buffio,$pack["len"]);
+				break;
+			}
+		}
+
+		return $buffio_msg;
+	}
+
+	private function Close(){
+		return socket_close($this->socket);
+	}
+
+	private function head_pack(){
+		$buffio = null;
+		//冗余上一次收到的byte
+		$buffio = $this->send_over;
+		$this->send_over = null;
+		//头部协议获取
+		while($head_pack_tmp = @socket_read($this->socket, 128, PHP_BINARY_READ)){
+			//读取追加字节
+			$buffio .= $head_pack_tmp;
+			$pack_len = strpos($buffio,":EOF;");
+			if($pack_len > 1){
+				$head_pack = substr($buffio,0,$pack_len);
+				$this->send_over = substr($buffio,$pack_len+5);
+				break;
+			}
+		}
+		if(!$head_pack){
+			return false;
+		}
+		return json_decode($head_pack,true);
+
+	}
+
+}
 
     /**
      *----------------------------------------------------------
@@ -412,5 +242,4 @@
         }else
             return $output;
     }
-
 ?>
